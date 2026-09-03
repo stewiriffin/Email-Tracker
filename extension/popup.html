@@ -215,6 +215,21 @@
         border-radius: 8px;
       }
 
+      .warning {
+        margin: 0 14px 12px;
+        padding: 10px 12px;
+        border: 1px solid #f59e0b;
+        border-radius: 12px;
+        background: #fffbeb;
+        color: #92400e;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .warning[hidden] {
+        display: none;
+      }
+
       .spinner {
         width: 16px;
         height: 16px;
@@ -258,12 +273,18 @@
           id="api-url"
           type="url"
           spellcheck="false"
-          placeholder="http://localhost:3000"
+          placeholder="https://your-app.vercel.app"
         />
         <button id="save-url" class="primary" type="button">Save</button>
       </div>
       <p id="save-msg" class="save-msg" role="status"></p>
     </section>
+
+    <div id="config-warning" class="warning" hidden role="alert">
+      Backend URL is not configured. Paste your Vercel production URL
+      (for example https://your-app.vercel.app) and save it before tracking
+      emails. Pixel injection in Gmail is disabled until this is set.
+    </div>
 
     <section class="panel">
       <h2>
@@ -275,7 +296,7 @@
 
     <div class="row-actions">
       <button id="refresh" class="ghost" type="button">Refresh</button>
-      <a id="dashboard-link" class="link-btn" href="http://localhost:3000" target="_blank" rel="noopener noreferrer">
+      <a id="dashboard-link" class="link-btn" href="#" target="_blank" rel="noopener noreferrer">
         Open dashboard
       </a>
     </div>

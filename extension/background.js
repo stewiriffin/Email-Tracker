@@ -1,5 +1,5 @@
-const DEFAULT_API_URL = "http://localhost:3000";
-const STORAGE_KEY = "apiBaseUrl";
+const STORAGE_KEY = "backendUrl";
+const LEGACY_STORAGE_KEY = "apiBaseUrl";
 const ALARM_NAME = "poll-recent-emails";
 const POLL_MINUTES = 1.5;
 const SNAPSHOT_KEY = "openSnapshot";
@@ -62,14 +62,27 @@ async function ensureAlarm() {
   });
 }
 
-async function getApiUrl() {
-  const stored = await chrome.storage.sync.get(STORAGE_KEY);
-  return String(stored[STORAGE_KEY] || DEFAULT_API_URL).replace(/\/+$/, "");
+async function getBackendUrl() {
+  const stored = await chrome.storage.sync.get([STORAGE_KEY, LEGACY_STORAGE_KEY]);
+  const url = String(stored[STORAGE_KEY] || stored[LEGACY_STORAGE_KEY] || "")
+    .trim()
+    .replace(/\/+$/, "");
+
+  if (url && !stored[STORAGE_KEY] && stored[LEGACY_STORAGE_KEY]) {
+    await chrome.storage.sync.set({ [STORAGE_KEY]: url });
+  }
+
+  return url;
 }
 
 async function pollRecentOpens() {
   try {
-    const apiUrl = await getApiUrl();
+    const apiUrl = await getBackendUrl();
+    if (!apiUrl) {
+      console.warn("[Email Tracker] backendUrl is not configured; skipping poll.");
+      return;
+    }
+
     const response = await fetch(`${apiUrl}/api/emails/recent`, {
       method: "GET",
       headers: { Accept: "application/json" },
@@ -154,7 +167,10 @@ async function clearBadge() {
 }
 
 async function registerTracking(payload = {}) {
-  const apiUrl = await getApiUrl();
+  const apiUrl = await getBackendUrl();
+  if (!apiUrl) {
+    throw new Error("Backend URL is not configured. Set it in the extension popup.");
+  }
 
   const response = await fetch(`${apiUrl}/api/emails`, {
     method: "POST",

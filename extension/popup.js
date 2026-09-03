@@ -1,16 +1,21 @@
-const DEFAULT_API_URL = "http://localhost:3000";
-const STORAGE_KEY = "apiBaseUrl";
+const STORAGE_KEY = "backendUrl";
+const LEGACY_STORAGE_KEY = "apiBaseUrl";
 
 const apiUrlInput = document.getElementById("api-url");
 const saveUrlButton = document.getElementById("save-url");
 const saveMsg = document.getElementById("save-msg");
+const configWarning = document.getElementById("config-warning");
 const emailList = document.getElementById("email-list");
 const listStatus = document.getElementById("list-status");
 const refreshButton = document.getElementById("refresh");
 const dashboardLink = document.getElementById("dashboard-link");
 
+function stripTrailingSlashes(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
 function normalizeBaseUrl(value) {
-  const trimmed = String(value || "").trim().replace(/\/+$/, "");
+  const trimmed = stripTrailingSlashes(value);
   if (!trimmed) return "";
 
   let parsed;
@@ -53,8 +58,12 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function setDashboardLink(baseUrl) {
-  dashboardLink.href = baseUrl || DEFAULT_API_URL;
+function setConfiguredState(baseUrl) {
+  const configured = Boolean(baseUrl);
+  configWarning.hidden = configured;
+  dashboardLink.href = configured ? baseUrl : "#";
+  dashboardLink.setAttribute("aria-disabled", configured ? "false" : "true");
+  refreshButton.disabled = !configured;
 }
 
 function renderLoading() {
@@ -70,6 +79,11 @@ function renderLoading() {
 function renderError(message) {
   listStatus.textContent = "Error";
   emailList.innerHTML = `<div class="error" role="alert">${escapeHtml(message)}</div>`;
+}
+
+function renderUnconfigured() {
+  listStatus.textContent = "Setup required";
+  emailList.innerHTML = `<div class="empty">Save your Vercel backend URL to load tracked emails.</div>`;
 }
 
 function renderEmails(emails) {
@@ -97,9 +111,13 @@ function renderEmails(emails) {
     .join("");
 }
 
-async function getStoredBaseUrl() {
-  const result = await chrome.storage.sync.get(STORAGE_KEY);
-  return result[STORAGE_KEY] || DEFAULT_API_URL;
+async function getStoredBackendUrl() {
+  const result = await chrome.storage.sync.get([STORAGE_KEY, LEGACY_STORAGE_KEY]);
+  const url = stripTrailingSlashes(result[STORAGE_KEY] || result[LEGACY_STORAGE_KEY] || "");
+  if (url && !result[STORAGE_KEY]) {
+    await chrome.storage.sync.set({ [STORAGE_KEY]: url });
+  }
+  return url;
 }
 
 async function ensureHostPermission(baseUrl) {
@@ -138,12 +156,19 @@ async function fetchRecentEmails(baseUrl) {
 }
 
 async function loadEmails() {
+  const storedUrl = await getStoredBackendUrl();
+  const baseUrl = normalizeBaseUrl(apiUrlInput.value || storedUrl);
+  setConfiguredState(baseUrl);
+
+  if (!baseUrl) {
+    renderUnconfigured();
+    return;
+  }
+
   renderLoading();
   refreshButton.disabled = true;
 
   try {
-    const baseUrl = normalizeBaseUrl(apiUrlInput.value || (await getStoredBaseUrl()));
-    setDashboardLink(baseUrl);
     const emails = await fetchRecentEmails(baseUrl);
     renderEmails(emails);
   } catch (error) {
@@ -171,7 +196,7 @@ async function saveBackendUrl() {
 
     await chrome.storage.sync.set({ [STORAGE_KEY]: baseUrl });
     apiUrlInput.value = baseUrl;
-    setDashboardLink(baseUrl);
+    setConfiguredState(baseUrl);
     saveMsg.textContent = "Saved.";
     await loadEmails();
   } catch (error) {
@@ -185,9 +210,9 @@ async function saveBackendUrl() {
 async function init() {
   chrome.runtime.sendMessage({ type: "CLEAR_BADGE" }).catch(() => {});
 
-  const storedUrl = await getStoredBaseUrl();
+  const storedUrl = await getStoredBackendUrl();
   apiUrlInput.value = storedUrl;
-  setDashboardLink(storedUrl);
+  setConfiguredState(storedUrl);
 
   saveUrlButton.addEventListener("click", saveBackendUrl);
   refreshButton.addEventListener("click", loadEmails);
@@ -199,6 +224,7 @@ async function init() {
   });
   dashboardLink.addEventListener("click", (event) => {
     event.preventDefault();
+    if (!dashboardLink.href || dashboardLink.href.endsWith("#")) return;
     chrome.tabs.create({ url: dashboardLink.href });
   });
 

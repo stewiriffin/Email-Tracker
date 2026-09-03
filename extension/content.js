@@ -1,5 +1,6 @@
 (() => {
   const TRACK_PREF_KEY = "trackByDefault";
+  const BACKEND_KEY = "backendUrl";
   const BOUND_ATTR = "data-email-tracker-bound";
   const PIXEL_ATTR = "data-email-tracker-pixel";
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -13,10 +14,19 @@
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "sync" && changes[TRACK_PREF_KEY]) {
+    if (area !== "sync") return;
+    if (changes[TRACK_PREF_KEY]) {
       state.trackByDefault = changes[TRACK_PREF_KEY].newValue !== false;
     }
   });
+
+  function getBackendUrl() {
+    return new Promise((resolve) => {
+      chrome.storage.sync.get(BACKEND_KEY, (result) => {
+        resolve(String(result[BACKEND_KEY] || "").trim().replace(/\/+$/, ""));
+      });
+    });
+  }
 
   function qs(root, selector) {
     try {
@@ -178,18 +188,25 @@
 
     try {
       if (isToggleOn(compose)) {
-        const draft = readCompose(compose);
-        if (draft.bodyEl && !hasTrackingPixel(draft.bodyEl) && EMAIL_RE.test(draft.recipient)) {
-          const result = await registerTracking({
-            recipient: draft.recipient,
-            subject: draft.subject,
-            body: draft.body,
-          });
-          appendPixel(
-            draft.bodyEl,
-            result.pixelUrl ||
-              `${result.apiUrl}/api/track/${result.trackingId}.png`
+        const backendUrl = await getBackendUrl();
+        if (!backendUrl) {
+          console.warn(
+            "[Email Tracker] backendUrl is not configured; skipping pixel injection."
           );
+        } else {
+          const draft = readCompose(compose);
+          if (draft.bodyEl && !hasTrackingPixel(draft.bodyEl) && EMAIL_RE.test(draft.recipient)) {
+            const result = await registerTracking({
+              recipient: draft.recipient,
+              subject: draft.subject,
+              body: draft.body,
+            });
+            appendPixel(
+              draft.bodyEl,
+              result.pixelUrl ||
+                `${backendUrl}/api/track/${result.trackingId}.png`
+            );
+          }
         }
       }
     } catch (error) {
