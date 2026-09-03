@@ -22,7 +22,12 @@ function isPublicAsset(pathname) {
 }
 
 function isDashboardPath(pathname) {
-  return pathname === "/" || pathname === "" || pathname === "/api/stream";
+  return (
+    pathname === "/" ||
+    pathname === "" ||
+    pathname === "/api/stream" ||
+    pathname === "/api/analytics"
+  );
 }
 
 function isTrackingPath(pathname) {

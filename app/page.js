@@ -4,6 +4,7 @@ import TrackingLog from "@/models/TrackingLog";
 import DashboardLive from "@/components/DashboardLive";
 import { parseUserAgent } from "@/lib/deviceParser";
 import { inferIsBotOrProxy } from "@/lib/openFilter";
+import { EMPTY_ANALYTICS, getAnalyticsSummary } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -70,15 +71,27 @@ async function getDashboardData() {
 
 export default async function Home() {
   let emails = [];
+  let analytics = EMPTY_ANALYTICS;
   let error = null;
 
   try {
-    emails = await getDashboardData();
+    const [emailRows, summary] = await Promise.all([
+      getDashboardData(),
+      getAnalyticsSummary(),
+    ]);
+    emails = emailRows;
+    analytics = summary;
   } catch (err) {
     console.error("Failed to load dashboard emails:", err);
     error =
       "Could not load emails. Check that MongoDB is running and MONGODB_URI is set.";
   }
 
-  return <DashboardLive initialEmails={emails} error={error} />;
+  return (
+    <DashboardLive
+      initialEmails={emails}
+      initialAnalytics={analytics}
+      error={error}
+    />
+  );
 }

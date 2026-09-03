@@ -1,13 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import AnalyticsCards from "@/components/AnalyticsCards";
 import ComposeModal from "@/components/ComposeModal";
 import EmailTable from "@/components/EmailTable";
 
 const EXCLUDE_AUTOMATED_KEY = "excludeAutomatedOpens";
+const EMPTY_ANALYTICS = {
+  totalSent: 0,
+  totalOpens: 0,
+  uniqueOpenRate: 0,
+  clickThroughRate: 0,
+  deviceBreakdown: { desktop: 0, mobile: 0 },
+};
 
-export default function DashboardLive({ initialEmails, error }) {
+export default function DashboardLive({
+  initialEmails,
+  initialAnalytics,
+  error,
+}) {
   const [emails, setEmails] = useState(initialEmails);
+  const [analytics, setAnalytics] = useState(initialAnalytics || EMPTY_ANALYTICS);
   const [glowingId, setGlowingId] = useState(null);
   const [liveState, setLiveState] = useState("connecting");
   const [excludeAutomated, setExcludeAutomated] = useState(true);
@@ -25,6 +38,10 @@ export default function DashboardLive({ initialEmails, error }) {
   useEffect(() => {
     setEmails(initialEmails);
   }, [initialEmails]);
+
+  useEffect(() => {
+    setAnalytics(initialAnalytics || EMPTY_ANALYTICS);
+  }, [initialAnalytics]);
 
   useEffect(() => {
     const source = new EventSource("/api/stream");
@@ -71,6 +88,8 @@ export default function DashboardLive({ initialEmails, error }) {
             : email
         );
       });
+
+      refreshAnalytics();
     };
 
     source.onerror = () => setLiveState("reconnecting");
@@ -89,11 +108,18 @@ export default function DashboardLive({ initialEmails, error }) {
     });
   }, [emails, excludeAutomated]);
 
-  const openedCount = useMemo(
-    () => visibleEmails.filter((email) => email.openCount > 0).length,
-    [visibleEmails]
-  );
-  const unopenedCount = visibleEmails.length - openedCount;
+  async function refreshAnalytics() {
+    try {
+      const response = await fetch("/api/analytics", { cache: "no-store" });
+      if (!response.ok) return;
+      const summary = await response.json();
+      if (summary && typeof summary.totalSent === "number") {
+        setAnalytics(summary);
+      }
+    } catch {
+      // Keep the last successful snapshot if a live refresh fails.
+    }
+  }
 
   function toggleExcludeAutomated() {
     setExcludeAutomated((current) => {
@@ -149,28 +175,9 @@ export default function DashboardLive({ initialEmails, error }) {
         </div>
       ) : null}
 
-      {visibleEmails.length > 0 ? (
-        <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <StatCard label="Sent" value={visibleEmails.length} />
-          <StatCard label="Opened" value={openedCount} />
-          <StatCard label="Unopened" value={unopenedCount} />
-        </section>
-      ) : null}
+      <AnalyticsCards analytics={analytics} />
 
       <EmailTable emails={visibleEmails} glowingId={glowingId} />
     </main>
-  );
-}
-
-function StatCard({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-stone-200 bg-white px-5 py-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-stone-900">
-        {value}
-      </p>
-    </div>
   );
 }
