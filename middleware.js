@@ -13,10 +13,77 @@ const ROUTE_LIMITS = {
 const buckets = globalThis.__emailTrackerRateBuckets || new Map();
 globalThis.__emailTrackerRateBuckets = buckets;
 
+function isPublicAsset(pathname) {
+  return (
+    pathname.startsWith("/_next/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt"
+  );
+}
+
+function isDashboardPath(pathname) {
+  return pathname === "/" || pathname === "";
+}
+
 function isTrackingPath(pathname) {
   return TRACKING_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
+}
+
+function timingSafeEqual(left, right) {
+  const encoder = new TextEncoder();
+  const a = encoder.encode(left);
+  const b = encoder.encode(right);
+  const length = Math.max(a.length, b.length);
+  let mismatch = a.length === b.length ? 0 : 1;
+
+  for (let i = 0; i < length; i += 1) {
+    mismatch |= (a[i] || 0) ^ (b[i] || 0);
+  }
+
+  return mismatch === 0;
+}
+
+function parseBasicCredentials(header) {
+  if (!header || !header.startsWith("Basic ")) return null;
+
+  try {
+    const decoded = atob(header.slice(6).trim());
+    const separator = decoded.indexOf(":");
+    if (separator < 0) return null;
+
+    return {
+      username: decoded.slice(0, separator),
+      password: decoded.slice(separator + 1),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isAuthorizedAdmin(request) {
+  const expectedUser = process.env.ADMIN_USERNAME || "";
+  const expectedPass = process.env.ADMIN_PASSWORD || "";
+  if (!expectedUser || !expectedPass) return false;
+
+  const credentials = parseBasicCredentials(request.headers.get("authorization"));
+  if (!credentials) return false;
+
+  return (
+    timingSafeEqual(credentials.username, expectedUser) &&
+    timingSafeEqual(credentials.password, expectedPass)
+  );
+}
+
+function unauthorizedDashboard() {
+  return new NextResponse("Authentication required", {
+    status: 401,
+    headers: {
+      "WWW-Authenticate": 'Basic realm="Admin Dashboard", charset="UTF-8"',
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 function normalizeOrigin(value) {
@@ -122,6 +189,19 @@ function applySecurityHeaders(response, request) {
 }
 
 export function middleware(request) {
+  const { pathname } = request.nextUrl;
+
+  if (isPublicAsset(pathname) || isTrackingPath(pathname)) {
+    if (request.method === "OPTIONS") {
+      return applySecurityHeaders(new NextResponse(null, { status: 204 }), request);
+    }
+    return applySecurityHeaders(NextResponse.next(), request);
+  }
+
+  if (isDashboardPath(pathname) && !isAuthorizedAdmin(request)) {
+    return applySecurityHeaders(unauthorizedDashboard(), request);
+  }
+
   if (request.method === "OPTIONS") {
     return applySecurityHeaders(new NextResponse(null, { status: 204 }), request);
   }
