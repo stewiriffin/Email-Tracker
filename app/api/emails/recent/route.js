@@ -69,7 +69,11 @@ export async function GET() {
   } catch (error) {
     console.error("Failed to load recent email stats:", error);
     return NextResponse.json(
-      { error: "Could not load recent tracked emails." },
+      {
+        error: "Could not load recent tracked emails.",
+        details: error.message,
+        stack: error.name,
+      },
       { status: 500 }
     );
   }
