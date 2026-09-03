@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "package-extension": "node scripts/package-extension.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",
