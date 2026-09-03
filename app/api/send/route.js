@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Email from "@/models/Email";
+import { prepareTrackedHtml } from "@/lib/rewriteLinks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,8 +97,7 @@ export async function POST(request) {
   }
 
   const trackingId = randomUUID();
-  const pixelTag = `<img src="${baseUrl}/api/track/${trackingId}.png" width="1" height="1" alt="" style="display:none;width:1px;height:1px;border:0;" />`;
-  const html = `${body}${pixelTag}`;
+  const html = prepareTrackedHtml(body, { baseUrl, trackingId });
 
   let email;
 
