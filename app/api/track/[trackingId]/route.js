@@ -45,8 +45,22 @@ async function logOpen(event) {
       openedAt: new Date(),
     });
 
-    const { emitOpenEvent } = await import("@/lib/openEvents");
+    const [{ emitOpenEvent }, { sendWebhookNotification }, { default: Email }] =
+      await Promise.all([
+        import("@/lib/openEvents"),
+        import("@/lib/notifier"),
+        import("@/models/Email"),
+      ]);
+
     emitOpenEvent(created);
+
+    const emailDocument = await Email.findOne({
+      trackingId: event.trackingId,
+    }).lean();
+
+    sendWebhookNotification(emailDocument, created).catch((error) => {
+      console.error("Failed to send open webhook:", error);
+    });
   } catch (error) {
     console.error("Failed to save tracking log:", error);
   }
