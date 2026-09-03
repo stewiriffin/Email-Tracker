@@ -1,4 +1,5 @@
 import { after, NextResponse } from "next/server";
+import { getRequestContext } from "@/lib/requestMeta";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,19 +18,6 @@ const PIXEL_HEADERS = {
   Pragma: "no-cache",
 };
 
-function getClientIp(request) {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const clientIp = forwardedFor.split(",")[0]?.trim();
-    if (clientIp) return clientIp;
-  }
-
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-
-  return "unknown";
-}
-
 function pixelResponse() {
   return new NextResponse(TRANSPARENT_GIF, {
     status: 200,
@@ -37,7 +25,7 @@ function pixelResponse() {
   });
 }
 
-async function logOpen({ trackingId, ipAddress, userAgent }) {
+async function logOpen(event) {
   try {
     const [{ default: dbConnect }, { default: TrackingLog }] =
       await Promise.all([
@@ -47,9 +35,13 @@ async function logOpen({ trackingId, ipAddress, userAgent }) {
 
     await dbConnect();
     await TrackingLog.create({
-      trackingId,
-      ipAddress,
-      userAgent,
+      trackingId: event.trackingId,
+      ipAddress: event.ipAddress,
+      userAgent: event.userAgent,
+      clientType: event.clientType,
+      device: event.device,
+      country: event.country,
+      city: event.city,
       openedAt: new Date(),
     });
   } catch (error) {
@@ -60,11 +52,10 @@ async function logOpen({ trackingId, ipAddress, userAgent }) {
 export async function GET(request, { params }) {
   const { trackingId: rawTrackingId } = await params;
   const trackingId = String(rawTrackingId || "").replace(/\.png$/i, "");
-  const ipAddress = getClientIp(request);
-  const userAgent = request.headers.get("user-agent") || "unknown";
+  const context = getRequestContext(request);
 
   if (trackingId) {
-    after(() => logOpen({ trackingId, ipAddress, userAgent }));
+    after(() => logOpen({ trackingId, ...context }));
   }
 
   return pixelResponse();

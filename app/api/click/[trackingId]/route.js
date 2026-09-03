@@ -1,22 +1,10 @@
 import { after, NextResponse } from "next/server";
 import { parseSafeHttpUrl } from "@/lib/rewriteLinks";
+import { getRequestContext } from "@/lib/requestMeta";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-function getClientIp(request) {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const clientIp = forwardedFor.split(",")[0]?.trim();
-    if (clientIp) return clientIp;
-  }
-
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-
-  return "unknown";
-}
 
 function invalidUrlResponse() {
   return NextResponse.json(
@@ -25,7 +13,7 @@ function invalidUrlResponse() {
   );
 }
 
-async function logClick({ trackingId, targetUrl, ipAddress, userAgent }) {
+async function logClick(event) {
   try {
     const [{ default: dbConnect }, { default: LinkClick }] = await Promise.all([
       import("@/lib/mongodb"),
@@ -34,10 +22,14 @@ async function logClick({ trackingId, targetUrl, ipAddress, userAgent }) {
 
     await dbConnect();
     await LinkClick.create({
-      trackingId,
-      targetUrl,
-      ipAddress,
-      userAgent,
+      trackingId: event.trackingId,
+      targetUrl: event.targetUrl,
+      ipAddress: event.ipAddress,
+      userAgent: event.userAgent,
+      clientType: event.clientType,
+      device: event.device,
+      country: event.country,
+      city: event.city,
       clickedAt: new Date(),
     });
   } catch (error) {
@@ -53,13 +45,14 @@ export async function GET(request, { params }) {
     return invalidUrlResponse();
   }
 
+  const context = getRequestContext(request);
+
   if (trackingId) {
     after(() =>
       logClick({
         trackingId,
         targetUrl: destination,
-        ipAddress: getClientIp(request),
-        userAgent: request.headers.get("user-agent") || "unknown",
+        ...context,
       })
     );
   }

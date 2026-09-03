@@ -27,6 +27,29 @@ const LinkClickSchema = new mongoose.Schema(
       maxlength: [512, "User agent is too long"],
       set: (value) => (value && String(value).trim() ? value : "unknown"),
     },
+    clientType: {
+      type: String,
+      default: "Unknown",
+      trim: true,
+      maxlength: [80, "Client type is too long"],
+    },
+    device: {
+      type: String,
+      enum: ["Desktop", "Mobile", "Tablet"],
+      default: "Desktop",
+    },
+    country: {
+      type: String,
+      default: "unknown",
+      trim: true,
+      maxlength: [8, "Country code is too long"],
+    },
+    city: {
+      type: String,
+      default: "unknown",
+      trim: true,
+      maxlength: [85, "City name is too long"],
+    },
     clickedAt: {
       type: Date,
       default: Date.now,

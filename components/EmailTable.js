@@ -16,6 +16,23 @@ function formatOpenTime(iso) {
   }).format(new Date(iso));
 }
 
+function formatLocation(city, country) {
+  const safeCity = city && city !== "unknown" ? city : "";
+  const safeCountry = country && country !== "unknown" ? country : "";
+  if (safeCity && safeCountry) return `${safeCity}, ${safeCountry}`;
+  if (safeCity) return safeCity;
+  if (safeCountry) return safeCountry;
+  return "Unknown location";
+}
+
+function MetaBadge({ children }) {
+  return (
+    <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-700">
+      {children}
+    </span>
+  );
+}
+
 export default function EmailTable({ emails }) {
   const [expandedId, setExpandedId] = useState(null);
 
@@ -146,6 +163,12 @@ function EmailRow({ email, isOpened, isExpanded, onToggle }) {
                     <dt className="text-xs font-medium text-stone-500">Timestamp</dt>
                     <dd className="text-sm text-stone-900">
                       {formatOpenTime(open.openedAt)}
+                    </dd>
+                    <dt className="text-xs font-medium text-stone-500">Client</dt>
+                    <dd className="flex flex-wrap gap-1.5">
+                      <MetaBadge>{open.device || "Desktop"}</MetaBadge>
+                      <MetaBadge>{open.clientType || "Unknown"}</MetaBadge>
+                      <MetaBadge>{formatLocation(open.city, open.country)}</MetaBadge>
                     </dd>
                     <dt className="text-xs font-medium text-stone-500">IP address</dt>
                     <dd className="font-mono text-sm text-stone-900">

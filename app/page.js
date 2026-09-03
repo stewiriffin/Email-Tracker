@@ -3,20 +3,29 @@ import Email from "@/models/Email";
 import TrackingLog from "@/models/TrackingLog";
 import EmailTable from "@/components/EmailTable";
 import ComposeModal from "@/components/ComposeModal";
+import { parseUserAgent } from "@/lib/deviceParser";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 function serializeLogs(logs) {
-  return logs.map((log) => ({
-    id: String(log._id),
-    openedAt:
-      log.openedAt instanceof Date
-        ? log.openedAt.toISOString()
-        : new Date(log.openedAt).toISOString(),
-    ipAddress: log.ipAddress || "unknown",
-    userAgent: log.userAgent || "unknown",
-  }));
+  return logs.map((log) => {
+    const parsed = parseUserAgent(log.userAgent);
+
+    return {
+      id: String(log._id),
+      openedAt:
+        log.openedAt instanceof Date
+          ? log.openedAt.toISOString()
+          : new Date(log.openedAt).toISOString(),
+      ipAddress: log.ipAddress || "unknown",
+      userAgent: log.userAgent || "unknown",
+      device: log.device || parsed.device,
+      clientType: log.clientType || parsed.clientType,
+      country: log.country || "unknown",
+      city: log.city || "unknown",
+    };
+  });
 }
 
 async function getDashboardData() {
