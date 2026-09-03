@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Email from "@/models/Email";
 import TrackingLog from "@/models/TrackingLog";
+import { getBaseUrl } from "@/lib/baseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,7 +121,7 @@ export async function POST(request) {
   }
 
   const trackingId = randomUUID();
-  const baseUrl = String(process.env.NEXT_PUBLIC_BASE_URL || "").replace(/\/+$/, "");
+  const baseUrl = getBaseUrl();
 
   try {
     await dbConnect();

@@ -97,33 +97,6 @@ function unauthorizedDashboard() {
   });
 }
 
-function normalizeOrigin(value) {
-  try {
-    return new URL(value).origin;
-  } catch {
-    return String(value || "").replace(/\/+$/, "");
-  }
-}
-
-function isAllowedOrigin(origin) {
-  if (!origin) return false;
-  if (origin.startsWith("chrome-extension://")) return true;
-  if (origin.startsWith("moz-extension://")) return true;
-
-  const configured = process.env.NEXT_PUBLIC_BASE_URL;
-  const allowed = new Set(
-    [
-      configured,
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-    ]
-      .filter(Boolean)
-      .map(normalizeOrigin)
-  );
-
-  return allowed.has(origin);
-}
-
 function clientIp(request) {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
@@ -160,6 +133,24 @@ function allowRequest(request) {
   return current.count <= limit;
 }
 
+function applyCorsHeaders(response, request) {
+  if (!request.nextUrl.pathname.startsWith("/api/")) {
+    return response;
+  }
+
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+  );
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Accept, Authorization"
+  );
+  response.headers.set("Access-Control-Max-Age", "86400");
+  return response;
+}
+
 function applySecurityHeaders(response, request) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -179,14 +170,7 @@ function applySecurityHeaders(response, request) {
     );
   }
 
-  const origin = request.headers.get("origin");
-  if (origin && isAllowedOrigin(origin)) {
-    response.headers.set("Access-Control-Allow-Origin", origin);
-    response.headers.set("Vary", "Origin");
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Accept");
-    response.headers.set("Access-Control-Max-Age", "86400");
-  }
+  applyCorsHeaders(response, request);
 
   if (isTrackingPath(request.nextUrl.pathname)) {
     response.headers.set(
@@ -199,13 +183,18 @@ function applySecurityHeaders(response, request) {
   return response;
 }
 
+function preflightResponse(request) {
+  return applySecurityHeaders(new NextResponse(null, { status: 200 }), request);
+}
+
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
+  if (request.method === "OPTIONS" && pathname.startsWith("/api/")) {
+    return preflightResponse(request);
+  }
+
   if (isPublicAsset(pathname) || isTrackingPath(pathname)) {
-    if (request.method === "OPTIONS") {
-      return applySecurityHeaders(new NextResponse(null, { status: 204 }), request);
-    }
     return applySecurityHeaders(NextResponse.next(), request);
   }
 
@@ -214,7 +203,7 @@ export function middleware(request) {
   }
 
   if (request.method === "OPTIONS") {
-    return applySecurityHeaders(new NextResponse(null, { status: 204 }), request);
+    return preflightResponse(request);
   }
 
   if (!allowRequest(request)) {

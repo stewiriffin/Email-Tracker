@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import Email from "@/models/Email";
 import { prepareTrackedHtml } from "@/lib/rewriteLinks";
+import { getBaseUrl } from "@/lib/baseUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,14 +25,6 @@ function serializeEmail(email) {
         ? email.createdAt.toISOString()
         : new Date(email.createdAt).toISOString(),
   };
-}
-
-function getBaseUrl() {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-  if (!baseUrl || !String(baseUrl).trim()) {
-    throw new Error("NEXT_PUBLIC_BASE_URL is not set");
-  }
-  return String(baseUrl).replace(/\/+$/, "");
 }
 
 function createTransporter() {
