@@ -1,13 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ComposeModal from "@/components/ComposeModal";
 import EmailTable from "@/components/EmailTable";
+
+const EXCLUDE_AUTOMATED_KEY = "excludeAutomatedOpens";
 
 export default function DashboardLive({ initialEmails, error }) {
   const [emails, setEmails] = useState(initialEmails);
   const [glowingId, setGlowingId] = useState(null);
   const [liveState, setLiveState] = useState("connecting");
+  const [excludeAutomated, setExcludeAutomated] = useState(true);
+  const excludeAutomatedRef = useRef(true);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(EXCLUDE_AUTOMATED_KEY);
+    if (stored !== null) {
+      const next = stored === "true";
+      setExcludeAutomated(next);
+      excludeAutomatedRef.current = next;
+    }
+  }, []);
 
   useEffect(() => {
     setEmails(initialEmails);
@@ -39,9 +52,14 @@ export default function DashboardLive({ initialEmails, error }) {
           return current;
         }
 
-        setGlowingId(target.id);
-        clearTimeout(glowTimer);
-        glowTimer = setTimeout(() => setGlowingId(null), 1800);
+        const shouldGlow = !(
+          excludeAutomatedRef.current && payload.open.isBotOrProxy
+        );
+        if (shouldGlow) {
+          setGlowingId(target.id);
+          clearTimeout(glowTimer);
+          glowTimer = setTimeout(() => setGlowingId(null), 1800);
+        }
 
         return current.map((email) =>
           email.trackingId === payload.trackingId
@@ -63,11 +81,28 @@ export default function DashboardLive({ initialEmails, error }) {
     };
   }, []);
 
+  const visibleEmails = useMemo(() => {
+    if (!excludeAutomated) return emails;
+    return emails.map((email) => {
+      const opens = email.opens.filter((open) => !open.isBotOrProxy);
+      return { ...email, opens, openCount: opens.length };
+    });
+  }, [emails, excludeAutomated]);
+
   const openedCount = useMemo(
-    () => emails.filter((email) => email.openCount > 0).length,
-    [emails]
+    () => visibleEmails.filter((email) => email.openCount > 0).length,
+    [visibleEmails]
   );
-  const unopenedCount = emails.length - openedCount;
+  const unopenedCount = visibleEmails.length - openedCount;
+
+  function toggleExcludeAutomated() {
+    setExcludeAutomated((current) => {
+      const next = !current;
+      excludeAutomatedRef.current = next;
+      window.localStorage.setItem(EXCLUDE_AUTOMATED_KEY, String(next));
+      return next;
+    });
+  }
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
@@ -91,7 +126,18 @@ export default function DashboardLive({ initialEmails, error }) {
                 : "Connecting live updates…"}
           </p>
         </div>
-        <ComposeModal />
+        <div className="flex flex-col items-stretch gap-3 sm:items-end">
+          <ComposeModal />
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-stone-700">
+            <input
+              type="checkbox"
+              checked={excludeAutomated}
+              onChange={toggleExcludeAutomated}
+              className="h-4 w-4 accent-teal-800"
+            />
+            Exclude Automated / Proxy Opens
+          </label>
+        </div>
       </header>
 
       {error ? (
@@ -103,15 +149,15 @@ export default function DashboardLive({ initialEmails, error }) {
         </div>
       ) : null}
 
-      {emails.length > 0 ? (
+      {visibleEmails.length > 0 ? (
         <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <StatCard label="Sent" value={emails.length} />
+          <StatCard label="Sent" value={visibleEmails.length} />
           <StatCard label="Opened" value={openedCount} />
           <StatCard label="Unopened" value={unopenedCount} />
         </section>
       ) : null}
 
-      <EmailTable emails={emails} glowingId={glowingId} />
+      <EmailTable emails={visibleEmails} glowingId={glowingId} />
     </main>
   );
 }

@@ -21,7 +21,12 @@ export async function GET() {
     const stats =
       trackingIds.length > 0
         ? await TrackingLog.aggregate([
-            { $match: { trackingId: { $in: trackingIds } } },
+            {
+              $match: {
+                trackingId: { $in: trackingIds },
+                isBotOrProxy: { $ne: true },
+              },
+            },
             {
               $group: {
                 _id: "$trackingId",

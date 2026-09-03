@@ -172,6 +172,18 @@ function EmailRow({ email, isOpened, isExpanded, isGlowing, onToggle }) {
                     <dd className="text-sm text-stone-900">
                       {formatOpenTime(open.openedAt)}
                     </dd>
+                    <dt className="text-xs font-medium text-stone-500">Open type</dt>
+                    <dd>
+                      {open.isBotOrProxy ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                          Automated Proxy
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-teal-100 px-2.5 py-1 text-xs font-semibold text-teal-800">
+                          Verified Human Open
+                        </span>
+                      )}
+                    </dd>
                     <dt className="text-xs font-medium text-stone-500">Client</dt>
                     <dd className="flex flex-wrap gap-1.5">
                       <MetaBadge>{open.device || "Desktop"}</MetaBadge>

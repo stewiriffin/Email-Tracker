@@ -46,7 +46,12 @@ export async function GET(request) {
     const counts =
       trackingIds.length > 0
         ? await TrackingLog.aggregate([
-            { $match: { trackingId: { $in: trackingIds } } },
+            {
+              $match: {
+                trackingId: { $in: trackingIds },
+                isBotOrProxy: { $ne: true },
+              },
+            },
             { $group: { _id: "$trackingId", openCount: { $sum: 1 } } },
           ])
         : [];

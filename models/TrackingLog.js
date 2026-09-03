@@ -44,6 +44,11 @@ const TrackingLogSchema = new mongoose.Schema(
       trim: true,
       maxlength: [85, "City name is too long"],
     },
+    isBotOrProxy: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     openedAt: {
       type: Date,
       default: Date.now,

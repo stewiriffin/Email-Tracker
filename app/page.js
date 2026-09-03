@@ -3,6 +3,7 @@ import Email from "@/models/Email";
 import TrackingLog from "@/models/TrackingLog";
 import DashboardLive from "@/components/DashboardLive";
 import { parseUserAgent } from "@/lib/deviceParser";
+import { inferIsBotOrProxy } from "@/lib/openFilter";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,6 +24,7 @@ function serializeLogs(logs) {
       clientType: log.clientType || parsed.clientType,
       country: log.country || "unknown",
       city: log.city || "unknown",
+      isBotOrProxy: inferIsBotOrProxy(log),
     };
   });
 }

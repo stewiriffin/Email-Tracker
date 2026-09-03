@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { getRequestContext } from "@/lib/requestMeta";
+import { detectBotOrProxy, isExcludedIp } from "@/lib/openFilter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ async function logOpen(event) {
       device: event.device,
       country: event.country,
       city: event.city,
+      isBotOrProxy: Boolean(event.isBotOrProxy),
       openedAt: new Date(),
     });
 
@@ -53,6 +55,10 @@ async function logOpen(event) {
       ]);
 
     emitOpenEvent(created);
+
+    if (created.isBotOrProxy) {
+      return;
+    }
 
     const emailDocument = await Email.findOne({
       trackingId: event.trackingId,
@@ -71,8 +77,13 @@ export async function GET(request, { params }) {
   const trackingId = String(rawTrackingId || "").replace(/\.png$/i, "");
   const context = getRequestContext(request);
 
+  if (isExcludedIp(context.ipAddress)) {
+    return pixelResponse();
+  }
+
   if (trackingId) {
-    after(() => logOpen({ trackingId, ...context }));
+    const isBotOrProxy = detectBotOrProxy(request, context);
+    after(() => logOpen({ trackingId, ...context, isBotOrProxy }));
   }
 
   return pixelResponse();
