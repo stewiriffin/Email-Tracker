@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 function formatSentDate(iso) {
   return new Intl.DateTimeFormat("en-US", {
@@ -33,8 +33,11 @@ function MetaBadge({ children }) {
   );
 }
 
-export default function EmailTable({ emails, glowingId }) {
+export default function EmailTable({ emails, glowingId, onDeleted }) {
   const [expandedId, setExpandedId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   if (!emails.length) {
     return (
@@ -65,6 +68,34 @@ export default function EmailTable({ emails, glowingId }) {
     );
   }
 
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    setDeleteError("");
+
+    try {
+      const response = await fetch(`/api/emails/${pendingDelete.id}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to delete email");
+      }
+
+      onDeleted?.(pendingDelete.id);
+      setExpandedId((current) =>
+        current === pendingDelete.id ? null : current
+      );
+      setPendingDelete(null);
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error ? error.message : "Failed to delete email"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
@@ -77,7 +108,7 @@ export default function EmailTable({ emails, glowingId }) {
               <th className="px-5 py-3.5">Status</th>
               <th className="px-5 py-3.5 text-right">Open Count</th>
               <th className="px-5 py-3.5">
-                <span className="sr-only">Details</span>
+                <span className="sr-only">Actions</span>
               </th>
             </tr>
           </thead>
@@ -96,17 +127,42 @@ export default function EmailTable({ emails, glowingId }) {
                   onToggle={() =>
                     setExpandedId(isExpanded ? null : email.id)
                   }
+                  onDelete={() => {
+                    setDeleteError("");
+                    setPendingDelete(email);
+                  }}
                 />
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {pendingDelete ? (
+        <DeleteConfirmModal
+          email={pendingDelete}
+          deleting={deleting}
+          error={deleteError}
+          onCancel={() => {
+            if (deleting) return;
+            setPendingDelete(null);
+            setDeleteError("");
+          }}
+          onConfirm={confirmDelete}
+        />
+      ) : null}
     </div>
   );
 }
 
-function EmailRow({ email, isOpened, isExpanded, isGlowing, onToggle }) {
+function EmailRow({
+  email,
+  isOpened,
+  isExpanded,
+  isGlowing,
+  onToggle,
+  onDelete,
+}) {
   return (
     <>
       <tr
@@ -140,19 +196,28 @@ function EmailRow({ email, isOpened, isExpanded, isGlowing, onToggle }) {
         <td className="whitespace-nowrap px-5 py-4 text-right tabular-nums text-stone-800">
           {email.openCount}
         </td>
-        <td className="px-5 py-4 text-right">
-          {isOpened ? (
+        <td className="px-5 py-4">
+          <div className="flex items-center justify-end gap-1">
+            {isOpened ? (
+              <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={isExpanded}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-teal-800 transition hover:bg-teal-100"
+              >
+                {isExpanded ? "Hide details" : "View details"}
+              </button>
+            ) : (
+              <span className="px-3 py-1.5 text-xs text-stone-400">—</span>
+            )}
             <button
               type="button"
-              onClick={onToggle}
-              aria-expanded={isExpanded}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-teal-800 transition hover:bg-teal-100"
+              onClick={onDelete}
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50"
             >
-              {isExpanded ? "Hide details" : "View details"}
+              Delete
             </button>
-          ) : (
-            <span className="text-xs text-stone-400">—</span>
-          )}
+          </div>
         </td>
       </tr>
       {isOpened && isExpanded ? (
@@ -206,5 +271,82 @@ function EmailRow({ email, isOpened, isExpanded, isGlowing, onToggle }) {
         </tr>
       ) : null}
     </>
+  );
+}
+
+function DeleteConfirmModal({ email, deleting, error, onCancel, onConfirm }) {
+  const titleId = useId();
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key === "Escape" && !deleting) {
+        onCancel();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [deleting, onCancel]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+      <button
+        type="button"
+        aria-label="Close delete dialog"
+        className="absolute inset-0 bg-stone-950/45"
+        onClick={onCancel}
+        disabled={deleting}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 w-full max-w-md rounded-2xl border border-stone-200 bg-white p-5 shadow-xl sm:p-6"
+      >
+        <h2 id={titleId} className="text-lg font-semibold text-stone-900">
+          Delete tracked email?
+        </h2>
+        <p className="mt-2 text-sm text-stone-600">
+          This removes the record for{" "}
+          <span className="font-medium text-stone-900">{email.recipient}</span>
+          {email.subject ? (
+            <>
+              {" "}
+              ({email.subject})
+            </>
+          ) : null}{" "}
+          and all associated open logs. This cannot be undone.
+        </p>
+        {error ? (
+          <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={deleting}
+            className="rounded-xl px-4 py-2.5 text-sm font-semibold text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={deleting}
+            className="inline-flex min-w-24 items-center justify-center rounded-xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-700/70"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

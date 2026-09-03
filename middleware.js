@@ -8,6 +8,7 @@ const ROUTE_LIMITS = {
   "POST /api/emails": 30,
   "GET /api/emails": 120,
   "GET /api/emails/recent": 120,
+  "GET /api/export": 10,
 };
 
 const buckets = globalThis.__emailTrackerRateBuckets || new Map();
@@ -21,13 +22,18 @@ function isPublicAsset(pathname) {
   );
 }
 
-function isDashboardPath(pathname) {
-  return (
+function isDashboardPath(pathname, method = "GET") {
+  if (
     pathname === "/" ||
     pathname === "" ||
     pathname === "/api/stream" ||
-    pathname === "/api/analytics"
-  );
+    pathname === "/api/analytics" ||
+    pathname === "/api/export"
+  ) {
+    return true;
+  }
+
+  return method === "DELETE" && /^\/api\/emails\/[^/]+$/.test(pathname);
 }
 
 function isTrackingPath(pathname) {
@@ -177,7 +183,7 @@ function applySecurityHeaders(response, request) {
   if (origin && isAllowedOrigin(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin);
     response.headers.set("Vary", "Origin");
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    response.headers.set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     response.headers.set("Access-Control-Allow-Headers", "Content-Type, Accept");
     response.headers.set("Access-Control-Max-Age", "86400");
   }
@@ -203,7 +209,7 @@ export function middleware(request) {
     return applySecurityHeaders(NextResponse.next(), request);
   }
 
-  if (isDashboardPath(pathname) && !isAuthorizedAdmin(request)) {
+  if (isDashboardPath(pathname, request.method) && !isAuthorizedAdmin(request)) {
     return applySecurityHeaders(unauthorizedDashboard(), request);
   }
 

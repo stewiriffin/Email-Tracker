@@ -121,6 +121,11 @@ export default function DashboardLive({
     }
   }
 
+  function handleDeleted(id) {
+    setEmails((current) => current.filter((email) => email.id !== id));
+    refreshAnalytics();
+  }
+
   function toggleExcludeAutomated() {
     setExcludeAutomated((current) => {
       const next = !current;
@@ -153,7 +158,15 @@ export default function DashboardLive({
           </p>
         </div>
         <div className="flex flex-col items-stretch gap-3 sm:items-end">
-          <ComposeModal />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <a
+              href="/api/export"
+              className="inline-flex items-center justify-center rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-800 shadow-sm transition hover:bg-stone-50"
+            >
+              Export CSV
+            </a>
+            <ComposeModal />
+          </div>
           <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-stone-700">
             <input
               type="checkbox"
@@ -177,7 +190,11 @@ export default function DashboardLive({
 
       <AnalyticsCards analytics={analytics} />
 
-      <EmailTable emails={visibleEmails} glowingId={glowingId} />
+      <EmailTable
+        emails={visibleEmails}
+        glowingId={glowingId}
+        onDeleted={handleDeleted}
+      />
     </main>
   );
 }
