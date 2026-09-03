@@ -22,7 +22,7 @@ function isPublicAsset(pathname) {
 }
 
 function isDashboardPath(pathname) {
-  return pathname === "/" || pathname === "";
+  return pathname === "/" || pathname === "" || pathname === "/api/stream";
 }
 
 function isTrackingPath(pathname) {
@@ -124,7 +124,7 @@ function clientIp(request) {
 
 function allowRequest(request) {
   const { pathname } = request.nextUrl;
-  if (!pathname.startsWith("/api/") || isTrackingPath(pathname)) {
+  if (!pathname.startsWith("/api/") || isTrackingPath(pathname) || pathname === "/api/stream") {
     return true;
   }
 

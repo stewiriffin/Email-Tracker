@@ -34,7 +34,7 @@ async function logOpen(event) {
       ]);
 
     await dbConnect();
-    await TrackingLog.create({
+    const created = await TrackingLog.create({
       trackingId: event.trackingId,
       ipAddress: event.ipAddress,
       userAgent: event.userAgent,
@@ -44,6 +44,9 @@ async function logOpen(event) {
       city: event.city,
       openedAt: new Date(),
     });
+
+    const { emitOpenEvent } = await import("@/lib/openEvents");
+    emitOpenEvent(created);
   } catch (error) {
     console.error("Failed to save tracking log:", error);
   }

@@ -13,3 +13,16 @@ body {
   background: #f4f1ea;
   color: #1c1917;
 }
+
+@keyframes row-glow {
+  0% {
+    background-color: rgb(204 251 241);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.row-glow > td {
+  animation: row-glow 1.8s ease-out;
+}

@@ -33,7 +33,7 @@ function MetaBadge({ children }) {
   );
 }
 
-export default function EmailTable({ emails }) {
+export default function EmailTable({ emails, glowingId }) {
   const [expandedId, setExpandedId] = useState(null);
 
   if (!emails.length) {
@@ -92,6 +92,7 @@ export default function EmailTable({ emails }) {
                   email={email}
                   isOpened={isOpened}
                   isExpanded={isExpanded}
+                  isGlowing={glowingId === email.id}
                   onToggle={() =>
                     setExpandedId(isExpanded ? null : email.id)
                   }
@@ -105,10 +106,17 @@ export default function EmailTable({ emails }) {
   );
 }
 
-function EmailRow({ email, isOpened, isExpanded, onToggle }) {
+function EmailRow({ email, isOpened, isExpanded, isGlowing, onToggle }) {
   return (
     <>
-      <tr className={isExpanded ? "bg-teal-50/40" : "bg-white hover:bg-stone-50"}>
+      <tr
+        className={[
+          isExpanded ? "bg-teal-50/40" : "bg-white hover:bg-stone-50",
+          isGlowing ? "row-glow" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <td className="whitespace-nowrap px-5 py-4 font-medium text-stone-900">
           {email.recipient}
         </td>

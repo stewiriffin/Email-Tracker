@@ -1,8 +1,7 @@
 import dbConnect from "@/lib/mongodb";
 import Email from "@/models/Email";
 import TrackingLog from "@/models/TrackingLog";
-import EmailTable from "@/components/EmailTable";
-import ComposeModal from "@/components/ComposeModal";
+import DashboardLive from "@/components/DashboardLive";
 import { parseUserAgent } from "@/lib/deviceParser";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +48,7 @@ async function getDashboardData() {
     logsByTrackingId.set(log.trackingId, existing);
   }
 
-  const rows = emails.map((email) => {
+  return emails.map((email) => {
     const opens = serializeLogs(logsByTrackingId.get(email.trackingId) || []);
 
     return {
@@ -65,8 +64,6 @@ async function getDashboardData() {
       opens,
     };
   });
-
-  return rows;
 }
 
 export default async function Home() {
@@ -77,61 +74,9 @@ export default async function Home() {
     emails = await getDashboardData();
   } catch (err) {
     console.error("Failed to load dashboard emails:", err);
-    error = "Could not load emails. Check that MongoDB is running and MONGODB_URI is set.";
+    error =
+      "Could not load emails. Check that MongoDB is running and MONGODB_URI is set.";
   }
 
-  const openedCount = emails.filter((email) => email.openCount > 0).length;
-  const unopenedCount = emails.length - openedCount;
-
-  return (
-    <main className="mx-auto min-h-screen max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-800">
-            Dashboard
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">
-            Email tracker
-          </h1>
-          <p className="mt-2 max-w-2xl text-stone-600">
-            Sent messages and their open activity, including timestamps, IP
-            addresses, and user-agents for every tracked open.
-          </p>
-        </div>
-        <ComposeModal />
-      </header>
-
-      {error ? (
-        <div
-          role="alert"
-          className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-        >
-          {error}
-        </div>
-      ) : null}
-
-      {emails.length > 0 ? (
-        <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <StatCard label="Sent" value={emails.length} />
-          <StatCard label="Opened" value={openedCount} />
-          <StatCard label="Unopened" value={unopenedCount} />
-        </section>
-      ) : null}
-
-      <EmailTable emails={emails} />
-    </main>
-  );
-}
-
-function StatCard({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-stone-200 bg-white px-5 py-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-stone-900">
-        {value}
-      </p>
-    </div>
-  );
+  return <DashboardLive initialEmails={emails} error={error} />;
 }
